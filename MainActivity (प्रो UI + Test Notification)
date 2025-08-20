@@ -1,0 +1,161 @@
+package com.kuku.markets
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.kuku.markets.notify.Notifier
+import com.kuku.markets.ui.theme.KukuAccent
+import com.kuku.markets.ui.theme.KukuNegative
+import com.kuku.markets.ui.theme.KukuPositive
+import com.kuku.markets.ui.theme.KukuTheme
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlin.math.absoluteValue
+
+@AndroidEntryPoint
+class MainActivity : ComponentActivity() {
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    setContent {
+      KukuTheme {
+        Scaffold(
+          topBar = { SmallTopAppBar(title = { Text("Kuku Markets") }) }
+        ) { pad ->
+          Box(Modifier.fillMaxSize().padding(pad)) {
+            AppNav()
+          }
+        }
+      }
+    }
+  }
+}
+
+@Composable
+fun AppNav() {
+  val nav = rememberNavController()
+  NavHost(nav, startDestination = "watch") {
+    composable("watch") { WatchlistScreen(onOpenDetail = { /* TODO charts */ }) }
+  }
+}
+
+data class Quote(val symbol: String, val price: Double, val changePct: Double)
+
+@Composable
+fun WatchlistScreen(onOpenDetail: (String) -> Unit) {
+  val ctx = LocalContext.current
+  var symbols by remember { mutableStateOf(listOf("RELIANCE","TCS","INFY")) }
+  var quotes by remember { mutableStateOf<Map<String, Quote>>(emptyMap()) }
+  var input by remember { mutableStateOf("") }
+
+  LaunchedEffect(symbols) {
+    while (isActive) {
+      val update = symbols.associateWith {
+        val base = 100 + (it.hashCode().absoluteValue % 200)
+        val price = base + (0..100).random() / 10.0
+        val pct = listOf(-1.2, -0.4, 0.2, 0.7, 1.3).random()
+        Quote(it, price, pct)
+      }
+      quotes = update
+      delay(1500)
+    }
+  }
+
+  Column(Modifier.fillMaxSize().padding(16.dp)) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      OutlinedTextField(
+        value = input, onValueChange = { input = it },
+        placeholder = { Text("Symbol (e.g., TCS)") },
+        modifier = Modifier.weight(1f),
+        singleLine = true
+      )
+      Spacer(Modifier.width(8.dp))
+      Button(onClick = {
+        val s = input.trim().uppercase()
+        if (s.isNotBlank() && s !in symbols) symbols = symbols + s
+        input = ""
+      }) { Text("Add") }
+    }
+
+    Spacer(Modifier.height(8.dp))
+    Button(onClick = {
+      Notifier.send(ctx, "Kuku Alert", "Demo notification working!")
+    }) { Text("Test Notification") }
+
+    Spacer(Modifier.height(16.dp))
+    LazyColumn {
+      items(symbols) { s ->
+        val q = quotes[s]
+        MarketTile(
+          symbol = s,
+          price = q?.price,
+          pct = q?.changePct,
+          onClick = { onOpenDetail(s) },
+          onRemove = { symbols = symbols.filterNot { it == s } }
+        )
+      }
+    }
+  }
+}
+
+@Composable
+fun MarketTile(
+  symbol: String,
+  price: Double?,
+  pct: Double?,
+  onClick: () -> Unit,
+  onRemove: () -> Unit
+) {
+  Card(
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(vertical = 8.dp)
+      .clickable { onClick() }
+  ) {
+    Row(
+      Modifier
+        .fillMaxWidth()
+        .padding(16.dp),
+      horizontalArrangement = Arrangement.SpaceBetween,
+      verticalAlignment = Alignment.CenterVertically
+    ) {
+      Column(Modifier.weight(1f)) {
+        Text(symbol, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold))
+        Text(text = price?.let { "₹${"%.2f".format(it)}" } ?: "—", style = MaterialTheme.typography.bodyMedium)
+      }
+      val color = if ((pct ?: 0.0) >= 0) KukuPositive else KukuNegative
+      AssistChip(
+        onClick = { },
+        label = { Text(pct?.let { "${"%.2f".format(it)}%" } ?: "—") },
+        colors = AssistChipDefaults.assistChipColors(
+          labelColor = Color.White,
+          containerColor = color
+        )
+      )
+      Spacer(Modifier.width(8.dp))
+      OutlinedButton(onClick = onRemove) { Text("Remove") }
+    }
+    Divider(Modifier.padding(horizontal = 16.dp))
+    Row(
+      Modifier.fillMaxWidth().padding(12.dp).background(KukuAccent.copy(alpha = 0.06f))
+    ) {
+      Text("Tap to see chart & alerts (coming soon)", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(4.dp))
+    }
+  }
+}
