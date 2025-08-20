@@ -1,0 +1,13 @@
+package com.kuku.markets.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+val KukuPrimary = Color(0xFF0D47A1)
+val KukuOnPrimary = Color(0xFFFFFFFF)
+val KukuSecondary = Color(0xFF00BCD4)
+val KukuBackground = Color(0xFF0B1221)
+val KukuSurface = Color(0xFF121A2A)
+val KukuOnSurface = Color(0xFFE6EAF2)
+val KukuPositive = Color(0xFF2ECC71)
+val KukuNegative = Color(0xFFE74C3C)
+val KukuAccent = Color(0xFFF39C12)
